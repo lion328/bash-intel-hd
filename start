@@ -97,5 +97,6 @@ uninit_displayport() {
 init_display
 init_displayport
 sleep 3
+reg_dump_all
 uninit_displayport
 uninit_display

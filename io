@@ -11,9 +11,11 @@ mmio_read() {
 
 mmio_write() {
     if [[ "$MOCK" == "1" ]]; then
-        printf "mmio_write stub; REG(0x%x) = 0x%x\n" $1 $2
+        printf "mmio_write stub: REG(0x%x) = 0x%x\n" $1 $2
         return
     fi
+
+    printf "SET REG(0x%08x) = 0x%08x\n" $1 $2
 
     reg=`to_int $1`
     addr=$(($BAR + $reg))
@@ -22,6 +24,25 @@ mmio_write() {
     data_le=`hex_convert_indian_u32 $data`
 
     echo -n $data_le | xxd -r -p | sudo dd of=/dev/mem oflag=seek_bytes seek=$addr bs=4 count=1 status=none
+}
+
+reg_dump() {
+    name=$2
+    if [[ -z $name ]]; then
+        name='?'
+    fi
+
+    v=`mmio_read $1`
+
+    printf "REG(0x%08x) = 0x%08x : $name\n" $1 $v
+}
+
+reg_dump_all() {
+    echo "------- REGISTER DUMP -------"
+    for var in "${!R_@}"; do
+        reg_dump ${!var} ${var:2}
+    done
+    echo "----- END REGISTER DUMP -----"
 }
 
 reg_flag_set() {
@@ -33,8 +54,6 @@ reg_flag_set() {
 
     v=$(($v | $2))
     mmio_write $1 $v
-
-    printf "SET REG(0x%08x) = 0x%08x\n" $1 $v
 }
 
 reg_wait_until_set() {
@@ -69,8 +88,6 @@ reg_flag_unset() {
 
     v=$(($v & ~$2))
     mmio_write $1 $v
-
-    printf "SET REG(0x%08x) = 0x%08x\n" $1 $v
 }
 
 reg_wait_until_unset() {
@@ -108,8 +125,6 @@ reg_mask_set() {
     v=$(($v & ~$2))
     v=$(($v | $part))
     mmio_write $1 $v
-
-    printf "SET REG(0x%08x) = 0x%08x\n" $1 $v
 }
 
 shift_to_mask() {
