@@ -2,7 +2,7 @@
 
 . init.sh
 
-echo PCI BAR at 0x$BAR_HEX
+echo PCI BAR 0 at 0x$BAR0_HEX
 
 if [[ "$MOCK" == "1" ]]; then
     echo "Write disabled"
@@ -56,6 +56,12 @@ uninit_display() {
 init_displayport() {
     echo "Initialize DisplayPort"
 
+    reg_mask_set $R_SBLC_PWM_CTL2 $M_SBLC_PWM_MAX_FREQ 0xBC
+    reg_flag_set $R_SCHICKEN_1 $B_SCHICKEN_1_128
+    reg_flag_set $R_SBLC_PWM_CTL1 $B_SBLC_PWM_PCH_ENABLE
+    reg_flag_unset $R_SBLC_PWM_CTL1 $B_SBLC_PWM_BACKLIGHT_POLARITY
+    reg_mask_set $R_SBLC_PWM_CTL2 $M_SBLC_PWM_DUTY_CYCLE 0xBC
+
     reg_mask_set $R_PP_DIVISOR $M_PP_DIVISOR_PWR_CYCLE_DELAY 6
 
     reg_mask_set $R_PP_OFF_DELAYS $M_PP_DELAYS_PWR_CHANGE 5000
@@ -66,12 +72,6 @@ init_displayport() {
 
     reg_flag_set $R_PP_CONTROL $(($B_PP_CONTROL_VDD_OVERRIDE | $B_PP_CONTROL_BACKLIGHT_ENABLE | $B_PP_CONTROL_PWR_DOWN_ON_RESET | $B_PP_CONTROL_PWR_STATE_TARGET))
     reg_wait_until_set $R_PP_STATUS $B_PP_STATUS_PANEL_ON
-
-    reg_mask_set $R_SBLC_PWM_CTL2 $M_SBLC_PWM_MAX_FREQ 0xBC
-    reg_flag_set $R_SCHICKEN_1 $B_SCHICKEN_1_128
-    reg_flag_set $R_SBLC_PWM_CTL1 $B_SBLC_PWM_PCH_ENABLE
-    reg_flag_unset $R_SBLC_PWM_CTL1 $B_SBLC_PWM_BACKLIGHT_POLARITY
-    reg_mask_set $R_SBLC_PWM_CTL2 $M_SBLC_PWM_DUTY_CYCLE 0xBC
 }
 
 uninit_displayport() {
@@ -79,11 +79,28 @@ uninit_displayport() {
 
     reg_flag_unset $R_PP_CONTROL $(($B_PP_CONTROL_VDD_OVERRIDE | $B_PP_CONTROL_BACKLIGHT_ENABLE | $B_PP_CONTROL_PWR_STATE_TARGET))
     reg_wait_until_unset $R_PP_STATUS $B_PP_STATUS_PANEL_ON
+
+    reg_set_u32 $R_PP_DIVISOR 0
+
+    reg_mask_set $R_PP_OFF_DELAYS $M_PP_DELAYS_PWR_CHANGE 0
+    reg_mask_set $R_PP_OFF_DELAYS $M_PP_DELAYS_BACKLIGHT_TO_FROM_PWR 0
+
+    reg_mask_set $R_PP_ON_DELAYS $M_PP_DELAYS_PWR_CHANGE 0
+    reg_mask_set $R_PP_ON_DELAYS $M_PP_DELAYS_BACKLIGHT_TO_FROM_PWR 0
+
+    reg_flag_unset $R_SBLC_PWM_CTL1 $B_SBLC_PWM_PCH_ENABLE
+    reg_mask_set $R_SBLC_PWM_CTL2 $(($M_SBLC_PWM_DUTY_CYCLE | $M_SBLC_PWM_MAX_FREQ)) 0
 }
+
+reg_dump_all
 
 init_display
 init_displayport
+
 sleep 3
 reg_dump_all
+
 uninit_displayport
 uninit_display
+
+reg_dump_all
