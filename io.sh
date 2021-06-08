@@ -1,29 +1,41 @@
 #!/bin/bash
 
-mmio_read() {
-    reg=`to_int $1`
-    addr=$(($BAR + $reg))
+mem_read_u32() {
+    addr=`to_int $1`
 
     hex=`sudo dd if=/dev/mem iflag=skip_bytes skip=$addr bs=4 count=1 status=none | xxd -e -g4 -p`
     hex_be=`hex_convert_indian_u32 $hex`
     printf "%d" 0x$hex_be
 }
 
-mmio_write() {
+mem_write_u32() {
     if [[ "$MOCK" == "1" ]]; then
-        printf "mmio_write stub: REG(0x%x) = 0x%x\n" $1 $2
+        printf "mem_write_u32 stub: 0x%x = 0x%x\n" $1 $2
         return
     fi
 
-    printf "SET REG(0x%08x) = 0x%08x\n" $1 $2
-
-    reg=`to_int $1`
-    addr=$(($BAR + $reg))
+    addr=`to_int $1`
 
     data=`printf "%08x" $2`
     data_le=`hex_convert_indian_u32 $data`
 
     echo -n $data_le | xxd -r -p | sudo dd of=/dev/mem oflag=seek_bytes seek=$addr bs=4 count=1 status=none
+}
+
+reg_to_bar0_addr() {
+    reg=`to_int $1`
+    addr=$(($BAR + $reg))
+
+    echo $addr
+}
+
+bar0_read_u32() {
+    mem_read_u32 `reg_to_bar0_addr $1`
+}
+
+bar0_write_u32() {
+    printf "SET REG(0x%08x) = 0x%08x\n" $1 $2
+    mem_write_u32 `reg_to_bar0_addr $1` $2
 }
 
 reg_dump() {
@@ -32,7 +44,7 @@ reg_dump() {
         name='?'
     fi
 
-    v=`mmio_read $1`
+    v=`bar0_read_u32 $1`
 
     printf "REG(0x%08x) = 0x%08x : $name\n" $1 $v
 }
@@ -48,12 +60,12 @@ reg_dump_all() {
 reg_flag_set() {
     printf "REG(0x%08x) |= 0x%08x\n" $1 $2
 
-    v=`mmio_read $1`
+    v=`bar0_read_u32 $1`
 
     printf "REG(0x%08x) == 0x%08x\n" $1 $v
 
     v=$(($v | $2))
-    mmio_write $1 $v
+    bar0_write_u32 $1 $v
 }
 
 reg_wait_until_set() {
@@ -65,7 +77,7 @@ reg_wait_until_set() {
 
     old=noninteger
     while true; do
-        vo=`mmio_read $1`
+        vo=`bar0_read_u32 $1`
         v=$(($vo & $2))
 
         if [[ $vo != $old ]]; then
@@ -82,12 +94,12 @@ reg_wait_until_set() {
 reg_flag_unset() {
     printf "REG(0x%08x) &= ~0x%08x\n" $1 $2
 
-    v=`mmio_read $1`
+    v=`bar0_read_u32 $1`
 
     printf "REG(0x%08x) == 0x%08x\n" $1 $v
 
     v=$(($v & ~$2))
-    mmio_write $1 $v
+    bar0_write_u32 $1 $v
 }
 
 reg_wait_until_unset() {
@@ -99,7 +111,7 @@ reg_wait_until_unset() {
 
     old=noninteger
     while true; do
-        vo=`mmio_read $1`
+        vo=`bar0_read_u32 $1`
         v=$(($vo & $2))
         
         if [[ $vo != $old ]]; then
@@ -118,13 +130,13 @@ reg_mask_set() {
 
     printf "REG(0x%08x) & 0x%08x = 0x%08x\n" $1 $2 $part
 
-    v=`mmio_read $1`
+    v=`bar0_read_u32 $1`
 
     printf "REG(0x%08x) == 0x%08x\n" $1 $v
 
     v=$(($v & ~$2))
     v=$(($v | $part))
-    mmio_write $1 $v
+    bar0_write_u32 $1 $v
 }
 
 shift_to_mask() {
