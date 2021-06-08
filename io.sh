@@ -22,6 +22,10 @@ file_write_u32() {
     echo -n $data_le | xxd -r -p | sudo dd of=/dev/mem oflag=seek_bytes seek=$addr bs=4 count=1 status=none
 }
 
+pci_config_read_u32() {
+    file_read_u32 "/sys/bus/pci/devices/$1/config" $2
+}
+
 mem_read_u32() {
     file_read_u32 /dev/mem $@
 }
