@@ -1,25 +1,33 @@
 #!/bin/bash
 
-mem_read_u32() {
-    addr=`to_int $1`
+file_read_u32() {
+    addr=`to_int $2`
 
-    hex=`sudo dd if=/dev/mem iflag=skip_bytes skip=$addr bs=4 count=1 status=none | xxd -e -g4 -p`
+    hex=`sudo dd if=$1 iflag=skip_bytes skip=$addr bs=4 count=1 status=none | xxd -e -g4 -p`
     hex_be=`hex_convert_indian_u32 $hex`
     printf "%d" 0x$hex_be
 }
 
-mem_write_u32() {
+file_write_u32() {
     if [[ "$MOCK" == "1" ]]; then
-        printf "mem_write_u32 stub: 0x%x = 0x%x\n" $1 $2
+        printf "file_write_u32 stub: $1 (0x%x) = 0x%x\n" $2 $3
         return
     fi
 
-    addr=`to_int $1`
+    addr=`to_int $2`
 
-    data=`printf "%08x" $2`
+    data=`printf "%08x" $3`
     data_le=`hex_convert_indian_u32 $data`
 
     echo -n $data_le | xxd -r -p | sudo dd of=/dev/mem oflag=seek_bytes seek=$addr bs=4 count=1 status=none
+}
+
+mem_read_u32() {
+    file_read_u32 /dev/mem $@
+}
+
+mem_write_u32() {
+    file_write_u32 /dev/mem $@
 }
 
 reg_to_bar0_addr() {
