@@ -1,24 +1,36 @@
 #!/bin/bash
 
 reg_var_all() {
-    compgen -A variable | grep -P "R_\d+_"
+    compgen -A variable | grep -P "[RP]_\d+_"
 }
 
 reg_name_all() {
-    reg_var_all | sed 's/^R_\([0-9]\+\)_//'
+    reg_var_all | sed 's/^[RP]_\([0-9]\+\)_//'
 }
 
 reg() {
-    var=`reg_var_all | grep -P "^R_\d+_$1\$"`
-    size=`echo $var | sed 's/^R_\([0-9]\+\)_.*$/\1/'`
-    echo $size ${!var}
+    var=`reg_var_all | grep -P "^[RP]_\d+_$1\$"`
+    size=`echo $var | sed 's/^[RP]_\([0-9]\+\)_.*$/\1/'`
+
+    case ${var::1} in
+        P) type=pci ;;
+        R) type=mmio ;;
+    esac
+
+    echo $type $size ${!var}
 }
 
-R_8_GMADR=0x00018
-R_8_GTTMMADR=0x00010
-R_4_IOBAR=0x00020
-R_4_ROMADR=0x00030
-R_4_BDSM=0x0005C
+# PCI registers
+
+P_8_GMADR=0x00018
+P_8_GTTMMADR=0x00010
+P_4_IOBAR=0x00020
+P_4_ROMADR=0x00030
+P_4_BDSM=0x0005C
+P_1_VTD_STATUS=0x00063
+P_1_DID2=0x00002
+
+# MMIO registers
 
 R_4_NDE_RSTWRN_OPT=0x46408
 B_RST_PCH_HANDSHAKE_ENABLE=$((1 << 4))

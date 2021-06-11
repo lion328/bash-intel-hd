@@ -65,19 +65,33 @@ reg_to_bar0_addr() {
 }
 
 reg_read_uint() {
-    mem_read_uint $1 `reg_to_bar0_addr $2`
+    case $1 in
+        pci)
+            pci_config_read_uint $2 $3
+            ;;
+        mmio)
+            mem_read_uint $2 `reg_to_bar0_addr $3`
+            ;;
+    esac
 }
 
 reg_write_uint() {
-    printf "SET REG(0x%08x) = 0x%08x\n" $2 $3
-    mem_write_uint $1 `reg_to_bar0_addr $2` $3
+    case $1 in
+        pci)
+            echo_err "reg_write_uint: write for PCI config is unimplemented"
+            ;;
+        mmio)
+            printf "SET REG(0x%08x) = 0x%08x\n" $3 $4
+            mem_write_uint $2 `reg_to_bar0_addr $3` $4
+            ;;
+    esac
 }
 
 reg_dump() {
     info=`reg $1`
     info_arr=($info)
-    strlen=$((${info_arr[0]} * 2))
-    addr=${info_arr[1]}
+    strlen=$((${info_arr[1]} * 2))
+    addr=${info_arr[2]}
     v=`reg_read_uint $info`
 
     printf "%-20s REG(0x%08x) = 0x%0${strlen}x\n" $1 $addr $v
@@ -92,18 +106,18 @@ reg_dump_all() {
 }
 
 reg_flag_set() {
-    printf "REG(0x%08x) |= 0x%08x\n" $2 $3
+    printf "REG(0x%08x) |= 0x%08x\n" $3 $4
 
-    v=`reg_read_uint $1 $2`
+    v=`reg_read_uint $1 $2 $3`
 
-    printf "REG(0x%08x) == 0x%08x\n" $2 $v
+    printf "REG(0x%08x) == 0x%08x\n" $3 $v
 
-    v=$(($v | $3))
-    reg_write_uint $1 $2 $v
+    v=$(($v | $4))
+    reg_write_uint $1 $2 $3 $v
 }
 
 reg_wait_until_set() {
-    printf "WAIT REG(0x%08x) & 0x%08x > 0\n" $2 $3
+    printf "WAIT REG(0x%08x) & 0x%08x > 0\n" $3 $4
 
     if [[ "$MOCK" == "1" ]]; then
         return
@@ -111,11 +125,11 @@ reg_wait_until_set() {
 
     old=noninteger
     while true; do
-        vo=`reg_read_uint $1 $2`
-        v=$(($vo & $3))
+        vo=`reg_read_uint $1 $2 $3`
+        v=$(($vo & $4))
 
         if [[ $vo != $old ]]; then
-            printf "REG(0x%08x) == 0x%08x\n" $2 $vo
+            printf "REG(0x%08x) == 0x%08x\n" $3 $vo
             old=$vo
         fi
 
@@ -126,18 +140,18 @@ reg_wait_until_set() {
 }
 
 reg_flag_unset() {
-    printf "REG(0x%08x) &= ~0x%08x\n" $2 $3
+    printf "REG(0x%08x) &= ~0x%08x\n" $3 $4
 
-    v=`reg_read_uint $1 $2`
+    v=`reg_read_uint $1 $2 $3`
 
-    printf "REG(0x%08x) == 0x%08x\n" $2 $v
+    printf "REG(0x%08x) == 0x%08x\n" $3 $v
 
-    v=$(($v & ~$3))
-    reg_write_uint $1 $2 $v
+    v=$(($v & ~$4))
+    reg_write_uint $1 $2 $3 $v
 }
 
 reg_wait_until_unset() {
-    printf "WAIT REG(0x%08x) & 0x%08x == 0\n" $2 $3
+    printf "WAIT REG(0x%08x) & 0x%08x == 0\n" $3 $4
 
     if [[ "$MOCK" == "1" ]]; then
         return
@@ -145,11 +159,11 @@ reg_wait_until_unset() {
 
     old=noninteger
     while true; do
-        vo=`reg_read_uint $1 $2`
-        v=$(($vo & $3))
+        vo=`reg_read_uint $1 $2 $3`
+        v=$(($vo & $4))
         
         if [[ $vo != $old ]]; then
-            printf "REG(0x%08x) == 0x%08x\n" $2 $vo
+            printf "REG(0x%08x) == 0x%08x\n" $3 $vo
             old=$vo
         fi
 
@@ -160,15 +174,15 @@ reg_wait_until_unset() {
 }
 
 reg_mask_set() {
-    part=`shift_to_mask $3 $4`
+    part=`shift_to_mask $4 $5`
 
-    printf "REG(0x%08x) & 0x%08x = 0x%08x\n" $2 $3 $part
+    printf "REG(0x%08x) & 0x%08x = 0x%08x\n" $3 $4 $part
 
-    v=`reg_read_uint $1 $2`
+    v=`reg_read_uint $1 $2 $3`
 
-    printf "REG(0x%08x) == 0x%08x\n" $2 $v
+    printf "REG(0x%08x) == 0x%08x\n" $3 $v
 
-    v=$(($v & ~$3))
+    v=$(($v & ~$4))
     v=$(($v | $part))
-    reg_write_uint $1 $2 $v
+    reg_write_uint $1 $2 $3 $v
 }
