@@ -9,7 +9,7 @@ reg_name_all() {
 }
 
 reg() {
-    var=`reg_var_all | grep $1`
+    var=`reg_var_all | grep -P "^R_\d+_$1\$"`
     size=`echo $var | sed 's/^R_\([0-9]\+\)_.*$/\1/'`
     echo $size ${!var}
 }
