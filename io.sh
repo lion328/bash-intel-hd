@@ -1,18 +1,19 @@
 #!/bin/bash
 
 file_read_bytes_hex() {
-    addr=`to_int $2`
-    sudo dd if=$1 iflag=skip_bytes skip=$addr bs=$3 count=1 status=none | xxd -e -g4 -p
+    addr=`to_int $3`
+    sudo dd "if=$1" iflag=skip_bytes skip=$addr bs=$2 count=1 status=none | xxd -e -g4 -p
 }
 
 file_write_bytes_hex() {
     strlen=${#3}
-    len=$(($strlen / 2))
 
-    if [[ $(($len * 2)) != $strlen ]]; then
+    if [[ $(($strlen % 2)) != 0 ]]; then
         echo "file_write_bytes_hex error: uneven size of hex"
         return
     fi
+
+    len=$(($strlen / 2))
 
     if [[ "$MOCK" == "1" ]]; then
         printf "file_write_bytes_hex stub: $1 (0x%08x) = %s\n" $2 $3
@@ -20,36 +21,40 @@ file_write_bytes_hex() {
     fi
 
     addr=`to_int $2`
-    echo -n $3 | xxd -r -p | sudo dd of=/dev/mem oflag=seek_bytes seek=$addr bs=$len count=1 status=none
+    echo -n $3 | xxd -r -p | sudo dd "of=$1" oflag=seek_bytes seek=$addr bs=$len count=1 status=none
 }
 
-file_read_u32() {
-    hex=`file_read_bytes_hex $1 $2 4`
-    hex_be=`hex_convert_indian_u32 $hex`
-    printf "%d" 0x$hex_be
+file_read_bytes_hex_le_to_be() {
+    hex=`file_read_bytes_hex $@`
+    hex_convert_indian $hex
 }
 
-file_write_u32() {
-    data=`printf "%08x" $3`
-    data_le=`hex_convert_indian_u32 $data`
-
+file_write_bytes_hex_be_to_le() {
+    data_le=`hex_convert_indian $data`
     file_write_bytes_hex $1 $2 $data_le
 }
 
-pci_config_read_u32() {
-    file_read_u32 "$PCI_DIR/config" $1
+file_read_uint() {
+    hex=`file_read_bytes_hex_le_to_be $@`
+    printf "%d" 0x$hex
 }
 
-mem_read_bytes_hex() {
-    file_read_bytes_hex /dev/mem $@
+file_write_uint() {
+    size=$(($2 * 2))
+    data=`printf "%0${size}x" $4`
+    file_write_bytes_hex_be_to_le $1 $3 $data
 }
 
-mem_read_u32() {
-    file_read_u32 /dev/mem $@
+pci_config_read_uint() {
+    file_read_uint "$PCI_DIR/config" $@
 }
 
-mem_write_u32() {
-    file_write_u32 /dev/mem $@
+mem_read_uint() {
+    file_read_uint /dev/mem $@
+}
+
+mem_write_uint() {
+    file_write_uint /dev/mem $@
 }
 
 reg_to_bar0_addr() {
@@ -59,47 +64,46 @@ reg_to_bar0_addr() {
     echo $addr
 }
 
-reg_read_u32() {
-    mem_read_u32 `reg_to_bar0_addr $1`
+reg_read_uint() {
+    mem_read_uint $1 `reg_to_bar0_addr $2`
 }
 
-reg_write_u32() {
-    printf "SET REG(0x%08x) = 0x%08x\n" $1 $2
-    mem_write_u32 `reg_to_bar0_addr $1` $2
+reg_write_uint() {
+    printf "SET REG(0x%08x) = 0x%08x\n" $2 $3
+    mem_write_uint $1 `reg_to_bar0_addr $2` $3
 }
 
 reg_dump() {
-    name=$2
-    if [[ -z $name ]]; then
-        name='?'
-    fi
+    info=`reg $1`
+    info_arr=($info)
+    strlen=$((${info_arr[0]} * 2))
+    addr=${info_arr[1]}
+    v=`reg_read_uint $info`
 
-    v=`reg_read_u32 $1`
-
-    printf "REG(0x%08x) = 0x%08x : $name\n" $1 $v
+    printf "%-20s REG(0x%08x) = 0x%0${strlen}x\n" $1 $addr $v
 }
 
 reg_dump_all() {
-    echo "------- REGISTER DUMP -------"
-    for var in "${!R_@}"; do
-        reg_dump ${!var} ${var:2}
+    echo "---------------------- REGISTER DUMP ----------------------"
+    for var in `reg_name_all`; do
+        reg_dump $var
     done
-    echo "----- END REGISTER DUMP -----"
+    echo "-------------------- END REGISTER DUMP --------------------"
 }
 
 reg_flag_set() {
-    printf "REG(0x%08x) |= 0x%08x\n" $1 $2
+    printf "REG(0x%08x) |= 0x%08x\n" $2 $3
 
-    v=`reg_read_u32 $1`
+    v=`reg_read_uint $1 $2`
 
-    printf "REG(0x%08x) == 0x%08x\n" $1 $v
+    printf "REG(0x%08x) == 0x%08x\n" $2 $v
 
-    v=$(($v | $2))
-    reg_write_u32 $1 $v
+    v=$(($v | $3))
+    reg_write_uint $1 $2 $v
 }
 
 reg_wait_until_set() {
-    printf "WAIT REG(0x%08x) & 0x%08x > 0\n" $1 $2
+    printf "WAIT REG(0x%08x) & 0x%08x > 0\n" $2 $3
 
     if [[ "$MOCK" == "1" ]]; then
         return
@@ -107,11 +111,11 @@ reg_wait_until_set() {
 
     old=noninteger
     while true; do
-        vo=`reg_read_u32 $1`
-        v=$(($vo & $2))
+        vo=`reg_read_uint $1 $2`
+        v=$(($vo & $3))
 
         if [[ $vo != $old ]]; then
-            printf "REG(0x%08x) == 0x%08x\n" $1 $vo
+            printf "REG(0x%08x) == 0x%08x\n" $2 $vo
             old=$vo
         fi
 
@@ -122,18 +126,18 @@ reg_wait_until_set() {
 }
 
 reg_flag_unset() {
-    printf "REG(0x%08x) &= ~0x%08x\n" $1 $2
+    printf "REG(0x%08x) &= ~0x%08x\n" $2 $3
 
-    v=`reg_read_u32 $1`
+    v=`reg_read_uint $1 $2`
 
-    printf "REG(0x%08x) == 0x%08x\n" $1 $v
+    printf "REG(0x%08x) == 0x%08x\n" $2 $v
 
-    v=$(($v & ~$2))
-    reg_write_u32 $1 $v
+    v=$(($v & ~$3))
+    reg_write_uint $1 $2 $v
 }
 
 reg_wait_until_unset() {
-    printf "WAIT REG(0x%08x) & 0x%08x == 0\n" $1 $2
+    printf "WAIT REG(0x%08x) & 0x%08x == 0\n" $2 $3
 
     if [[ "$MOCK" == "1" ]]; then
         return
@@ -141,11 +145,11 @@ reg_wait_until_unset() {
 
     old=noninteger
     while true; do
-        vo=`reg_read_u32 $1`
-        v=$(($vo & $2))
+        vo=`reg_read_uint $1 $2`
+        v=$(($vo & $3))
         
         if [[ $vo != $old ]]; then
-            printf "REG(0x%08x) == 0x%08x\n" $1 $vo
+            printf "REG(0x%08x) == 0x%08x\n" $2 $vo
             old=$vo
         fi
 
@@ -156,32 +160,15 @@ reg_wait_until_unset() {
 }
 
 reg_mask_set() {
-    part=`shift_to_mask $2 $3`
+    part=`shift_to_mask $3 $4`
 
-    printf "REG(0x%08x) & 0x%08x = 0x%08x\n" $1 $2 $part
+    printf "REG(0x%08x) & 0x%08x = 0x%08x\n" $2 $3 $part
 
-    v=`reg_read_u32 $1`
+    v=`reg_read_uint $1 $2`
 
-    printf "REG(0x%08x) == 0x%08x\n" $1 $v
+    printf "REG(0x%08x) == 0x%08x\n" $2 $v
 
-    v=$(($v & ~$2))
+    v=$(($v & ~$3))
     v=$(($v | $part))
-    reg_write_u32 $1 $v
-}
-
-shift_to_mask() {
-    mask=$1
-    val=$2
-
-    bit=0
-    left=$mask
-    while [[ $(($left & 1)) == 0 ]]; do
-        bit=$(($bit + 1))
-        left=$(($left >> 1))
-    done
-
-    val=$(($val << $bit))
-    val=$(($val & $mask))
-
-    echo $val
+    reg_write_uint $1 $2 $v
 }
