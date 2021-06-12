@@ -66,10 +66,10 @@ reg_to_bar0_addr() {
 
 reg_read_uint() {
     case $1 in
-        pci)
+        PCI2)
             pci_config_read_uint $2 $3
             ;;
-        mmio)
+        MMIO)
             mem_read_uint $2 `reg_to_bar0_addr $3`
             ;;
     esac
@@ -90,11 +90,12 @@ reg_write_uint() {
 reg_dump() {
     info=`reg $1`
     info_arr=($info)
+    type=${info_arr[0]}
     strlen=$((${info_arr[1]} * 2))
     addr=${info_arr[2]}
     v=`reg_read_uint $info`
 
-    printf "%-20s REG(0x%08x) = 0x%0${strlen}x\n" $1 $addr $v
+    printf "%-20s $info_arr(0x%08x) = 0x%0${strlen}x\n" $1 $addr $v
 }
 
 reg_dump_all() {

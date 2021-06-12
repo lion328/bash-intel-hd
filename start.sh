@@ -80,7 +80,7 @@ uninit_displayport() {
     reg_flag_unset `reg PP_CONTROL` $(($B_PP_CONTROL_VDD_OVERRIDE | $B_PP_CONTROL_BACKLIGHT_ENABLE | $B_PP_CONTROL_PWR_STATE_TARGET))
     reg_wait_until_unset `reg PP_STATUS` $B_PP_STATUS_PANEL_ON
 
-    reg_set_u32 `reg PP_DIVISOR` 0
+    reg_set_uint `reg PP_DIVISOR` 0
 
     reg_mask_set `reg PP_OFF_DELAYS` $M_PP_DELAYS_PWR_CHANGE 0
     reg_mask_set `reg PP_OFF_DELAYS` $M_PP_DELAYS_BACKLIGHT_TO_FROM_PWR 0

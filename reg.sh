@@ -13,8 +13,8 @@ reg() {
     size=`echo $var | sed 's/^[RP]_\([0-9]\+\)_.*$/\1/'`
 
     case ${var::1} in
-        P) type=pci ;;
-        R) type=mmio ;;
+        P) type=PCI2 ;;
+        R) type=MMIO ;;
     esac
 
     echo $type $size ${!var}
@@ -29,6 +29,7 @@ P_4_ROMADR=0x00030
 P_4_BDSM=0x0005C
 P_1_VTD_STATUS=0x00063
 P_1_DID2=0x00002
+P_4_ASLS=0x000FC
 
 # MMIO registers
 
