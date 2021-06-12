@@ -1,5 +1,8 @@
 #!/bin/bash
 
+PCI_HOST_BRIDGE_ADDR="0000:00:00.0"
+PCI_GPU_ADDR="0000:00:02.0"
+
 file_read_bytes_hex() {
     addr=`to_int $3`
     sudo dd "if=$1" iflag=skip_bytes skip=$addr bs=$2 count=1 status=none | xxd -e -g4 -p
@@ -45,8 +48,12 @@ file_write_uint() {
     file_write_bytes_hex_be_to_le $1 $3 $data
 }
 
+pci_config_file() {
+    echo "/sys/bus/pci/devices/$1/config"
+}
+
 pci_config_read_uint() {
-    file_read_uint "$PCI_DIR/config" $@
+    file_read_uint `pci_config_file $1` ${@:2}
 }
 
 mem_read_uint() {
@@ -66,8 +73,11 @@ reg_to_bar0_addr() {
 
 reg_read_uint() {
     case $1 in
+        PCI0)
+            pci_config_read_uint $PCI_HOST_BRIDGE_ADDR $2 $3
+            ;;
         PCI2)
-            pci_config_read_uint $2 $3
+            pci_config_read_uint $PCI_GPU_ADDR $2 $3
             ;;
         MMIO)
             mem_read_uint $2 `reg_to_bar0_addr $3`
@@ -77,8 +87,11 @@ reg_read_uint() {
 
 reg_write_uint() {
     case $1 in
+        PCI0)
+            echo_err "reg_write_uint: write for PCI configuration space of host bridge is unimplemented"
+            ;;
         PCI2)
-            echo_err "reg_write_uint: write for PCI config is unimplemented"
+            echo_err "reg_write_uint: write for PCI configuration space of GPU is unimplemented"
             ;;
         MMIO)
             printf "SET REG(0x%08x) = 0x%08x\n" $3 $4

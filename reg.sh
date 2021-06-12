@@ -1,18 +1,19 @@
 #!/bin/bash
 
 reg_var_all() {
-    compgen -A variable | grep -P "[RP]_\d+_"
+    compgen -A variable | grep -P "[HRP]_\d+_"
 }
 
 reg_name_all() {
-    reg_var_all | sed 's/^[RP]_\([0-9]\+\)_//'
+    reg_var_all | sed 's/^[HRP]_\([0-9]\+\)_//'
 }
 
 reg() {
-    var=`reg_var_all | grep -P "^[RP]_\d+_$1\$"`
-    size=`echo $var | sed 's/^[RP]_\([0-9]\+\)_.*$/\1/'`
+    var=`reg_var_all | grep -P "^[HRP]_\d+_$1\$"`
+    size=`echo $var | sed 's/^[HRP]_\([0-9]\+\)_.*$/\1/'`
 
     case ${var::1} in
+        H) type=PCI0 ;;
         P) type=PCI2 ;;
         R) type=MMIO ;;
     esac
@@ -20,15 +21,26 @@ reg() {
     echo $type $size ${!var}
 }
 
-# PCI registers
+# PCI 0:0.0 (Host Bridge) registers
+# see also Intel CPU datasheet
 
+H_2_VID=0x00000
+H_2_DID=0x00002
+H_2_GGC=0x00050
+H_4_TOLUD=0x000BC
+H_4_BDSM=0x000B0
+
+# PCI 0:2.0 (GPU) registers
+# see also Intel Graphics PRM
+
+P_2_VID2=0x00000
+P_2_DID2=0x00002
 P_8_GMADR=0x00018
 P_8_GTTMMADR=0x00010
 P_4_IOBAR=0x00020
 P_4_ROMADR=0x00030
-P_4_BDSM=0x0005C
+P_4_BDSM_MIRROR=0x0005C
 P_1_VTD_STATUS=0x00063
-P_1_DID2=0x00002
 P_4_ASLS=0x000FC
 
 # MMIO registers
