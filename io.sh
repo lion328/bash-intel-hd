@@ -77,10 +77,10 @@ reg_read_uint() {
 
 reg_write_uint() {
     case $1 in
-        pci)
+        PCI2)
             echo_err "reg_write_uint: write for PCI config is unimplemented"
             ;;
-        mmio)
+        MMIO)
             printf "SET REG(0x%08x) = 0x%08x\n" $3 $4
             mem_write_uint $2 `reg_to_bar0_addr $3` $4
             ;;
